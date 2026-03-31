@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Intent Aware Intelligent Information Procession System</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI';
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            color: white;
+        }
+
+        .container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(15px);
+            padding: 30px;
+            border-radius: 15px;
+            width: 320px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.4);
+            animation: fadeIn 1s ease;
+        }
+
+        h2 {
+            text-align: center;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 8px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background: cyan;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background: #00bcd4;
+            transform: scale(1.05);
+        }
+
+        .link {
+            text-align: center;
+            margin-top: 10px;
+            cursor: pointer;
+            color: cyan;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .dashboard {
+            padding: 20px;
+        }
+
+        .news-card {
+            background: rgba(255,255,255,0.1);
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 10px;
+            transition: 0.3s;
+        }
+
+        .news-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0 15px cyan;
+        }
+
+        @keyframes fadeIn {
+            from {opacity:0; transform: translateY(20px);}
+            to {opacity:1;}
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- LOGIN -->
+<div class="container" id="loginPage">
+    <div class="card">
+        <h2>Login</h2>
+
+        <input type="email" id="loginEmail" placeholder="Email">
+        <input type="password" id="loginPassword" placeholder="Password">
+
+        <button onclick="login()">Login</button>
+
+        <div class="link" onclick="showRegister()">New user? Register</div>
+    </div>
+</div>
+
+<!-- REGISTER -->
+<div class="container hidden" id="registerPage">
+    <div class="card">
+        <h2>Register</h2>
+
+        <input type="text" id="regUsername" placeholder="Username">
+        <input type="email" id="regEmail" placeholder="Email">
+        <input type="password" id="regPassword" placeholder="Password">
+        <input type="password" id="regConfirm" placeholder="Confirm Password">
+
+        <select id="regRole">
+            <option>Geopolitics</option>
+            <option>Investor</option>
+        </select>
+
+        <button onclick="register()">Register</button>
+
+        <div class="link" onclick="showLogin()">Already have account?</div>
+    </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="dashboard hidden" id="dashboard">
+
+    <h1>Intent Aware Intelligent Information Procession System</h1>
+
+    <h3 id="welcome"></h3>
+
+    <button onclick="fetchNews()">Get News</button>
+
+    <div id="news"></div>
+
+</div>
+
+<script>
+
+let currentUser = {};
+let selectedRole = "";
+
+// 🔄 SWITCH PAGES
+function showRegister() {
+    loginPage.classList.add("hidden");
+    registerPage.classList.remove("hidden");
+}
+
+function showLogin() {
+    registerPage.classList.add("hidden");
+    loginPage.classList.remove("hidden");
+}
+
+// 🔐 REGISTER
+async function register() {
+
+    let password = regPassword.value;
+    let confirm = regConfirm.value;
+
+    if(password !== confirm){
+        alert("Passwords do not match");
+        return;
+    }
+
+    try {
+        let res = await fetch(`http://127.0.0.1:8000/register/?username=${regUsername.value}&email=${regEmail.value}&password=${password}&role=${regRole.value}`, {
+            method: "POST"
+        });
+
+        let data = await res.json();
+
+        if(res.ok){
+            alert(data.message || "Registered successfully");
+            showLogin();
+        } else {
+            alert(data.detail || "Registration failed");
+        }
+
+    } catch (err) {
+        alert("Server error");
+    }
+}
+
+// 🔐 LOGIN
+async function login() {
+
+    try {
+        let res = await fetch(`http://127.0.0.1:8000/login/?email=${loginEmail.value}&password=${loginPassword.value}`, {
+            method: "POST"
+        });
+
+        let data = await res.json();
+
+        if(res.ok){
+            currentUser = data;
+            selectedRole = data.role;
+
+            // 🔥 STORE EMAIL FOR HYBRID SYSTEM
+            localStorage.setItem("email", data.email);
+
+            loginPage.classList.add("hidden");
+            dashboard.classList.remove("hidden");
+
+            welcome.innerText = "Welcome! Role: " + selectedRole;
+
+        } else {
+            alert(data.detail || "Login failed");
+        }
+
+    } catch (err) {
+        alert("Server error");
+    }
+}
+
+// 📰 FETCH NEWS (UPDATED FOR HYBRID)
+async function fetchNews() {
+
+    let email = localStorage.getItem("email");
+
+    if(!email){
+        alert("User email missing. Please login again.");
+        return;
+    }
+
+    try {
+        let res = await fetch(`http://127.0.0.1:8000/fetch-news/?role=${selectedRole}&email=${email}`, {
+            method: "POST"
+        });
+
+        let data = await res.json();
+
+        let output = "";
+
+        data.results.forEach(n => {
+            output += `
+            <div class="news-card">
+                <h3>${n.title}</h3>
+                <p>${n.summary}</p>
+
+                <p><b>Impact:</b> ${n.impact}</p>
+                <p><b>Risk:</b> ${n.risk}</p>
+                <p><b>Action:</b> ${n.action}</p>
+
+                <a href="${n.source}" target="_blank">Read Full News</a>
+            </div>
+            `;
+        });
+
+        document.getElementById("news").innerHTML = output;
+
+    } catch (err) {
+        alert("Failed to fetch news");
+    }
+}
+
+</script>
+
+</body>
+</html>
