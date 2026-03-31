@@ -1,16 +1,16 @@
-from fastapi.middleware.cors import CORSMiddleware
-from ai_service import analyze_news_batch
-from email_service import send_email
+from .fastapi.middleware.cors import CORSMiddleware
+from .ai_service import analyze_news_batch
+from .email_service import send_email
 import feedparser
 import requests
-from fastapi import FastAPI, Depends, Query, HTTPException
-from sqlalchemy.orm import Session
-from database import SessionLocal, engine
-from models import Base, News, User
+from .fastapi import FastAPI, Depends, Query, HTTPException
+from .sqlalchemy.orm import Session
+from .database import SessionLocal, engine
+from .models import Base, News, User
 
 # 🔥 Scheduler
-from apscheduler.schedulers.background import BackgroundScheduler
-from datetime import datetime
+from .apscheduler.schedulers.background import BackgroundScheduler
+from .datetime import datetime
 
 app = FastAPI()
 
