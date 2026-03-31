@@ -1,16 +1,16 @@
-from .fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, Depends, Query, HTTPException
+from sqlalchemy.orm import Session
+from apscheduler.schedulers.background import BackgroundScheduler
+from datetime import datetime
+
 from .ai_service import analyze_news_batch
 from .email_service import send_email
-import feedparser
-import requests
-from .fastapi import FastAPI, Depends, Query, HTTPException
-from .sqlalchemy.orm import Session
 from .database import SessionLocal, engine
 from .models import Base, News, User
 
-# 🔥 Scheduler
-from .apscheduler.schedulers.background import BackgroundScheduler
-from .datetime import datetime
+import feedparser
+import requests
 
 app = FastAPI()
 
@@ -41,8 +41,13 @@ N8N_WEBHOOK_URL = "http://localhost:5678/webhook/news-ingest"
 # 🔐 REGISTER
 # =========================
 @app.post("/register/")
-def register(username: str = Query(...), email: str = Query(...), password: str = Query(...), role: str = Query(...), db: Session = Depends(get_db)):
-
+def register(
+    username: str = Query(...),
+    email: str = Query(...),
+    password: str = Query(...),
+    role: str = Query(...),
+    db: Session = Depends(get_db)
+):
     existing = db.query(User).filter(User.email == email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already exists")
@@ -59,26 +64,37 @@ def register(username: str = Query(...), email: str = Query(...), password: str 
 # 🔐 LOGIN
 # =========================
 @app.post("/login/")
-def login(email: str = Query(...), password: str = Query(...), db: Session = Depends(get_db)):
-
+def login(
+    email: str = Query(...),
+    password: str = Query(...),
+    db: Session = Depends(get_db)
+):
     user = db.query(User).filter(User.email == email).first()
 
     if not user or user.password != password:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    return {"message": "Login successful", "email": user.email, "role": user.role}
+    return {
+        "message": "Login successful",
+        "email": user.email,
+        "role": user.role
+    }
 
 
 # =========================
-# 📰 FETCH NEWS (FIXED)
+# 📰 FETCH NEWS (FINAL FIX)
 # =========================
 @app.post("/fetch-news/")
-def fetch_news(role: str = Query(...), email: str = Query(...), db: Session = Depends(get_db)):
+def fetch_news(
+    role: str = Query(...),
+    email: str = Query(...),
+    db: Session = Depends(get_db)
+):
 
     feed = feedparser.parse("https://www.thehindu.com/news/international/?service=rss")
 
     raw_news = []
-    for entry in feed.entries[:10]:  # 🔥 TAKE MORE → FILTER LATER
+    for entry in feed.entries[:10]:
         raw_news.append({
             "title": entry.title,
             "summary": entry.get("summary", ""),
@@ -89,7 +105,6 @@ def fetch_news(role: str = Query(...), email: str = Query(...), db: Session = De
 
     final_news = []
 
-    # 🔥 ENSURE EXACTLY 5 RELEVANT NEWS
     for i, item in enumerate(raw_news):
         ai = ai_results[i]
 
@@ -106,9 +121,7 @@ def fetch_news(role: str = Query(...), email: str = Query(...), db: Session = De
         if len(final_news) == 5:
             break
 
-    # =========================
-    # 🔥 STORE + PREPARE HTML
-    # =========================
+    # 🔥 BUILD SINGLE EMAIL HTML
     html = f"<h2>🔥 Intent Aware Intelligent Information Processing System</h2>"
     html += f"<h3>Role: {role}</h3>"
 
@@ -136,26 +149,18 @@ def fetch_news(role: str = Query(...), email: str = Query(...), db: Session = De
 
     db.commit()
 
-    # =========================
-    # 🔥 SINGLE EMAIL (MAIN FIX)
-    # =========================
+    # ✅ SINGLE EMAIL
     try:
         send_email(email, "🚨 Top 5 News Updates", html)
+        print("✅ Email sent successfully")
     except Exception as e:
-        print("Backend Email Error:", e)
+        print("Email Error:", e)
 
-    # =========================
-    # 🔥 n8n BACKUP (SEND FULL HTML)
-    # =========================
+    # ✅ n8n backup
     try:
         requests.post(N8N_WEBHOOK_URL, json={
             "email": email,
-            "title": "Top 5 News",
-            "impact": "Multiple updates",
-            "risk": "Various risks",
-            "action": "Check full email",
-            "source": "https://www.thehindu.com",
-            "html": html   # 🔥 FULL MAIL CONTENT
+            "html": html
         })
     except Exception as e:
         print("n8n Error:", e)
@@ -164,7 +169,7 @@ def fetch_news(role: str = Query(...), email: str = Query(...), db: Session = De
 
 
 # =========================
-# 📧 DAILY EMAIL (UPDATED)
+# 📧 DAILY EMAIL
 # =========================
 def send_daily_news():
 
