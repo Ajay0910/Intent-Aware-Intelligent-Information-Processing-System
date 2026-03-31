@@ -1,13 +1,15 @@
 from groq import Groq
 import json
+import os
 
-# 🔐 Add your Groq API key
-client = Groq(api_key="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")
+# ✅ GET FROM ENV (RENDER)
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 
 def analyze_news_batch(news_list, role):
 
     combined_news = ""
+
     for i, news in enumerate(news_list):
         combined_news += f"""
 News {i+1}:
@@ -21,6 +23,7 @@ You are a professional analyst.
 Analyze each news strictly for role: {role}
 
 Return ONLY JSON ARRAY like this:
+
 [
   {{
     "relevant": true,
@@ -31,9 +34,7 @@ Return ONLY JSON ARRAY like this:
 ]
 
 Rules:
-- Risk must be a REAL explanation (NOT high/medium/low)
-- Example: "Oil prices may rise due to supply disruption affecting global markets"
-- Be specific and practical
+- Risk must be REAL explanation
 - No generic answers
 - If not relevant → relevant=false
 
@@ -44,15 +45,12 @@ News:
     try:
         response = client.chat.completions.create(
             model="llama-3.1-8b-instant",
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
+            messages=[{"role": "user", "content": prompt}],
             temperature=0.3
         )
 
         text = response.choices[0].message.content.strip()
 
-        # 🔥 Remove markdown if present
         if text.startswith("```"):
             text = text.replace("```json", "").replace("```", "").strip()
 
@@ -61,13 +59,12 @@ News:
     except Exception as e:
         print("GROQ ERROR:", e)
 
-        # 🔁 fallback
         return [
             {
                 "relevant": True,
                 "impact": "AI unavailable",
                 "action": "Try again later",
-                "risk": "Unable to analyze risk at the moment"
+                "risk": "Unable to analyze risk"
             }
             for _ in news_list
         ]
